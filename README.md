@@ -1,2 +1,2 @@
-# ansible_jenkins_slave
-jenkins_slave module for ansible
+# ansible_jenkins_agent
+jenkins_agent module for ansible
