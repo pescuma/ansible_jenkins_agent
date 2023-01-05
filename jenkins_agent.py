@@ -209,6 +209,14 @@ options:
         type: str
         default: empty when creating, current value when changing node
 
+    jnlp_websocket:
+        description:
+            - Use WebSocket to connect to the Jenkins master rather than the TCP port. See JEP-222 for background.
+            - Only used if I(launch_method='jnlp')
+        required: false
+        type: bool
+        default: false
+
     command_launch_command:
         description:
             - Single command to launch an agent program, which controls the agent computer and communicates with the master. Jenkins assumes that the executed program launches the agent.jar program on the correct machine.
@@ -567,6 +575,11 @@ jnlp_secret:
     type: str
     returned: if I(launch_method='jnlp')
 
+jnlp_websocket:
+    description: Use WebSocket to connect to the Jenkins master rather than the TCP port. See JEP-222 for background.
+    type: bool
+    returned: if I(launch_method='jnlp')
+
 command_launch_command:
     description: Single command to launch an agent program, which controls the agent computer and communicates with the master. Jenkins assumes that the executed program launches the agent.jar program on the correct machine.
     type: str
@@ -770,6 +783,7 @@ def run_module():
         jnlp_fail_if_workspace_missing = dict(required=False, type="bool", default=None),
         jnlp_tunnel = dict(required=False, type="str", default=None),
         jnlp_jvm_options = dict(required=False, type="str", default=None),
+        jnlp_websocket = dict(required=False, type="bool", default=False),
         command_launch_command = dict(required=False, type="str", default=None),
         wmi_admin_username = dict(required=False, type="str", default=None),
         wmi_admin_password = dict(required=False, no_log=True, type="str", default=None),
@@ -874,6 +888,7 @@ args = [
 	jnlp_fail_if_workspace_missing: $jnlp_fail_if_workspace_missing,
 	jnlp_tunnel: $jnlp_tunnel,
 	jnlp_jvm_options: $jnlp_jvm_options,
+    jnlp_websocket: $jnlp_websocket,
 	command_launch_command: $command_launch_command,
 	wmi_admin_username: $wmi_admin_username,
 	wmi_admin_password: $wmi_admin_password,
@@ -915,6 +930,7 @@ args.jnlp_internal_dir = to_string_arg(args.jnlp_internal_dir, 'remoting')
 args.jnlp_fail_if_workspace_missing = to_bool_arg(args.jnlp_fail_if_workspace_missing, false)
 args.jnlp_tunnel = to_string_arg(args.jnlp_tunnel)
 args.jnlp_jvm_options = to_string_arg(args.jnlp_jvm_options)
+args.jnlp_websocket = to_bool_arg(args.jnlp_websocket)
 args.command_launch_command = to_string_arg(args.command_launch_command)
 args.wmi_admin_username = to_string_arg(args.wmi_admin_username)
 args.wmi_admin_password = to_string_arg(args.wmi_admin_password)
@@ -1091,6 +1107,8 @@ def isLauncherChange(current) {
 			return true
 		if (arg_different(args.jnlp_jvm_options, current.jnlp_jvm_options))
 			return true
+        if (arg_different(args.jnlp_websocket, current.jnlp_websocket))
+			return true
 	}
 
 	if (current.launch_method == 'command') {
@@ -1224,6 +1242,7 @@ def getCurrentState(node = null) {
 			result.jnlp_tunnel = launcher.@tunnel ?: ''
 			result.jnlp_jvm_options = launcher.@vmargs ?: ''
 			result.jnlp_secret = computer.jnlpMac
+            result.jnlp_websocket = launcher.isWebSocket()
 			
 		} else if (isInstanceOf(launcher, 'hudson.slaves.CommandLauncher')) {
 			result.launch_method = 'command'
@@ -1371,7 +1390,9 @@ def createMode() {
 
 def createJnlpLauncher() {
 	result = new JNLPLauncher(args.jnlp_tunnel.val, args.jnlp_jvm_options.val)
-	
+
+    result.setWebSocket(args.jnlp_websocket.val)
+
 	result.workDirSettings = new RemotingWorkDirSettings(
 		!args.jnlp_workdir_enabled.val, 
 		args.jnlp_workdir_path.val,
